@@ -1,0 +1,149 @@
+version: '3.8'
+
+services:
+  mysql:
+    image: mysql:8.0
+    container_name: revticket-mysql
+    environment:
+      MYSQL_ROOT_PASSWORD: 12345
+    ports:
+      - "3306:3306"
+    volumes:
+      - mysql_data:/var/lib/mysql
+    networks:
+      - revtickets-network
+
+  mongo:
+    image: mongo:7.0
+    container_name: revticket-mongo
+    ports:
+      - "27017:27017"
+    volumes:
+      - mongo_data:/data/db
+    networks:
+      - revtickets-network
+
+  service-registry:
+    build: ./microservices-backend/service-registry
+    container_name: service-registry
+    ports:
+      - "8761:8761"
+    networks:
+      - revtickets-network
+
+  auth-service:
+    build: ./microservices-backend/auth-service
+    container_name: auth-service
+    ports:
+      - "8086:8086"
+    depends_on:
+      - service-registry
+    networks:
+      - revtickets-network
+
+  user-service:
+    build: ./microservices-backend/user-service
+    container_name: user-service
+    ports:
+      - "8081:8081"
+    environment:
+      SPRING_DATASOURCE_URL: jdbc:mysql://mysql:3306/user_db?createDatabaseIfNotExist=true
+    depends_on:
+      - mysql
+    networks:
+      - revtickets-network
+
+  event-service:
+    build: ./microservices-backend/event-service
+    container_name: event-service
+    ports:
+      - "8082:8082"
+    environment:
+      SPRING_DATASOURCE_URL: jdbc:mysql://mysql:3306/event_db?createDatabaseIfNotExist=true
+    depends_on:
+      - mysql
+    networks:
+      - revtickets-network
+
+  booking-service:
+    build: ./microservices-backend/booking-service
+    container_name: booking-service
+    ports:
+      - "8083:8083"
+    environment:
+      SPRING_DATASOURCE_URL: jdbc:mysql://mysql:3306/booking_db?createDatabaseIfNotExist=true
+    depends_on:
+      - mysql
+    networks:
+      - revtickets-network
+
+  payment-service:
+    build: ./microservices-backend/payment-service
+    container_name: payment-service
+    ports:
+      - "8084:8084"
+    environment:
+      SPRING_DATASOURCE_URL: jdbc:mysql://mysql:3306/payment_db?createDatabaseIfNotExist=true
+    depends_on:
+      - mysql
+    networks:
+      - revtickets-network
+
+  notification-service:
+    build: ./microservices-backend/notification-service
+    container_name: notification-service
+    ports:
+      - "8085:8085"
+    environment:
+      SPRING_DATA_MONGODB_URI: mongodb://mongo:27017/notification_db
+    depends_on:
+      - mongo
+    networks:
+      - revtickets-network
+
+  review-service:
+    build: ./microservices-backend/review-service
+    container_name: review-service
+    ports:
+      - "8087:8087"
+    environment:
+      SPRING_DATA_MONGODB_URI: mongodb://mongo:27017/review_db
+    depends_on:
+      - mongo
+    networks:
+      - revtickets-network
+
+  api-gateway:
+    build: ./microservices-backend/api-gateway
+    container_name: api-gateway
+    ports:
+      - "8080:8080"
+    depends_on:
+      - service-registry
+      - auth-service
+      - user-service
+      - event-service
+      - booking-service
+      - payment-service
+      - notification-service
+      - review-service
+    networks:
+      - revtickets-network
+
+  frontend:
+    build: ./monolithic-frontend
+    container_name: frontend
+    ports:
+      - "4200:4200"
+    depends_on:
+      - api-gateway
+    networks:
+      - revtickets-network
+
+volumes:
+  mysql_data:
+  mongo_data:
+
+networks:
+  revtickets-network:
+    driver: bridge

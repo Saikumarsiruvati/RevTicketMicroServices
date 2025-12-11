@@ -1,0 +1,4 @@
+SHOW DATABASES;
+USE user_db;
+SHOW TABLES;
+SELECT * FROM users;
