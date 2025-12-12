@@ -1,6 +1,8 @@
 package com.revtickets.booking.controller;
 
 import com.revtickets.booking.model.Booking;
+import com.revtickets.booking.model.Notification;
+import com.revtickets.booking.repository.NotificationRepository;
 import com.revtickets.booking.service.BookingService;
 import com.revtickets.booking.service.EmailService;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -23,6 +25,9 @@ public class BookingController {
     @Autowired
     private RestTemplate restTemplate;
     
+    @Autowired
+    private NotificationRepository notificationRepository;
+    
     @Value("${user.service.url}")
     private String userServiceUrl;
 
@@ -38,50 +43,46 @@ public class BookingController {
         System.out.println("Booking created with ID: " + createdBooking.getId());
         
         try {
-            System.out.println("Fetching user details for userId: " + booking.getUserId());
+            // Get booking details for notification
+            Map<String, Object> bookingDetails = restTemplate.getForObject(
+                "http://localhost:8083/api/bookings/" + createdBooking.getId() + "/details", Map.class);
+            
+            // Get user details
             Map<String, Object> user = restTemplate.getForObject(
-                userServiceUrl + "/api/users/" + booking.getUserId(), Map.class);
-            System.out.println("User email: " + (user != null ? user.get("email") : "NULL"));
+                userServiceUrl + "/api/users/" + createdBooking.getUserId(), Map.class);
             
-            System.out.println("Fetching show details for showId: " + booking.getShowId());
-            Map<String, Object> show = restTemplate.getForObject(
-                "http://localhost:8082/api/shows/" + booking.getShowId(), Map.class);
-            System.out.println("Show fetched: " + (show != null ? "YES" : "NULL"));
-            
-            System.out.println("Fetching event details for eventId: " + show.get("eventId"));
-            Map<String, Object> event = restTemplate.getForObject(
-                "http://localhost:8082/api/events/" + show.get("eventId"), Map.class);
-            System.out.println("Event title: " + (event != null ? event.get("title") : "NULL"));
-            
-            System.out.println("Fetching venue details for venueId: " + show.get("venueId"));
-            Map<String, Object> venue = restTemplate.getForObject(
-                "http://localhost:8082/api/venues/" + show.get("venueId"), Map.class);
-            System.out.println("Venue name: " + (venue != null ? venue.get("name") : "NULL"));
-            
-            if (user != null && event != null && show != null && venue != null) {
-                System.out.println("\n🔔 SENDING EMAIL NOW...");
-                emailService.sendBookingConfirmationEmail(
-                    (String) user.get("email"),
-                    (String) user.get("name"),
-                    String.valueOf(createdBooking.getId()),
-                    (String) event.get("title"),
-                    show.get("showTime").toString(),
-                    createdBooking.getSeatNumbers(),
-                    String.valueOf(createdBooking.getTotalAmount()),
-                    (String) venue.get("name"),
-                    (String) event.get("language"),
-                    (String) event.get("genreOrType")
+            if (bookingDetails != null && user != null) {
+                // Save notification to MongoDB
+                System.out.println("💾 Saving notification to MongoDB...");
+                Notification notification = new Notification();
+                notification.setUserId(createdBooking.getUserId());
+                notification.setUserName(user.get("name").toString());
+                notification.setBookingId(createdBooking.getId());
+                notification.setMovieName(bookingDetails.get("movieName").toString());
+                notification.setVenueName(bookingDetails.get("venueName").toString());
+                notification.setShowTime(bookingDetails.get("showTime").toString());
+                notification.setNumberOfSeats(Integer.parseInt(bookingDetails.get("numberOfSeats").toString()));
+                notification.setSeatNumbers(bookingDetails.get("seatNumbers").toString());
+                notification.setTotalAmount(Double.parseDouble(bookingDetails.get("totalAmount").toString()));
+                notification.setMessage("Booking confirmed for " + bookingDetails.get("movieName") + " at " + bookingDetails.get("venueName"));
+                notification.setType("BOOKING_CONFIRMATION");
+                Notification saved = notificationRepository.save(notification);
+                System.out.println("✅ Notification saved with ID: " + saved.getId());
+                
+                // Call notification service to send email
+                System.out.println("📧 Calling notification service for email...");
+                Map<String, Object> notificationRequest = new java.util.HashMap<>();
+                notificationRequest.put("bookingId", createdBooking.getId());
+                
+                restTemplate.postForObject(
+                    "http://localhost:8085/api/notifications/booking-confirmation",
+                    notificationRequest,
+                    String.class
                 );
-                System.out.println("Email method called successfully");
-            } else {
-                System.err.println("❌ MISSING DATA - Cannot send email!");
-                System.err.println("User: " + (user != null));
-                System.err.println("Event: " + (event != null));
-                System.err.println("Show: " + (show != null));
-                System.err.println("Venue: " + (venue != null));
+                System.out.println("✅ Email sent successfully");
             }
         } catch (Exception e) {
-            System.err.println("❌ ERROR in booking email: " + e.getMessage());
+            System.err.println("❌ ERROR: " + e.getMessage());
             e.printStackTrace();
         }
         
