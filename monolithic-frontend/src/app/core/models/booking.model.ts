@@ -9,6 +9,7 @@ export interface Booking {
   status: string;
   qrCode?: string;
   paymentId?: string;
+  movieName?: string;
 }
 
 export interface BookingRequest {

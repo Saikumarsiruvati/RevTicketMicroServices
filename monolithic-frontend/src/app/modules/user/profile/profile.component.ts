@@ -50,10 +50,7 @@ import { User } from '../../../core/models/user.model';
 
             <mat-form-field appearance="outline" class="full-width">
               <mat-label>Phone</mat-label>
-              <input matInput formControlName="phone" required>
-              <mat-error *ngIf="profileForm.get('phone')?.hasError('required')">
-                Phone is required
-              </mat-error>
+              <input matInput formControlName="phone">
             </mat-form-field>
 
             <mat-form-field appearance="outline" class="full-width">
@@ -193,7 +190,7 @@ export class ProfileComponent implements OnInit {
     this.profileForm = this.fb.group({
       name: ['', Validators.required],
       email: [{value: '', disabled: true}],
-      phone: ['', Validators.required],
+      phone: [''],
       role: [{value: '', disabled: true}]
     });
   }
@@ -213,27 +210,38 @@ export class ProfileComponent implements OnInit {
   }
 
   onSubmit(): void {
+    console.log('Form valid:', this.profileForm.valid);
+    console.log('Current user:', this.currentUser);
+    console.log('Form values:', this.profileForm.value);
+    
     if (this.profileForm.valid && this.currentUser) {
       this.isLoading = true;
       
       const updatedUser = {
         ...this.currentUser,
         name: this.profileForm.get('name')?.value,
-        phone: this.profileForm.get('phone')?.value
+        phone: this.profileForm.get('phone')?.value || ''
       };
+      
+      console.log('Updating user:', updatedUser);
       
       this.userService.updateProfile(updatedUser).subscribe({
         next: (user) => {
+          console.log('Update successful:', user);
           this.authService.updateUser(user);
           this.currentUser = user;
           this.snackBar.open('Profile updated successfully!', 'Close', { duration: 3000 });
           this.isLoading = false;
         },
         error: (err) => {
-          this.snackBar.open('Error updating profile', 'Close', { duration: 3000 });
+          console.error('Update error:', err);
+          this.snackBar.open('Error updating profile: ' + (err.error?.message || err.message), 'Close', { duration: 5000 });
           this.isLoading = false;
         }
       });
+    } else {
+      console.log('Form invalid or no user');
+      this.snackBar.open('Please fill all required fields', 'Close', { duration: 3000 });
     }
   }
 

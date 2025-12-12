@@ -48,9 +48,11 @@ public class AuthController {
             String resetToken = UUID.randomUUID().toString();
             resetTokens.put(resetToken, email);
             emailService.sendPasswordResetEmail(email, resetToken);
-            return ResponseEntity.ok(Map.of("message", "Password reset link sent to " + email));
+            return ResponseEntity.ok(Map.of("message", "Password reset link sent to your email"));
         } catch (Exception e) {
-            return ResponseEntity.ok(Map.of("message", "If the email exists, a reset link has been sent"));
+            System.err.println("Forgot password error: " + e.getMessage());
+            e.printStackTrace();
+            return ResponseEntity.status(500).body(Map.of("message", "Failed to send reset email. Please try again."));
         }
     }
 

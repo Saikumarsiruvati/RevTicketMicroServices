@@ -34,6 +34,7 @@ public class EmailService {
             System.out.println("To: " + toEmail);
             System.out.println("Subject: RevTickets - Password Reset Request");
             System.out.println("Body:\n" + emailBody);
+            System.out.println("Reset Link: " + resetLink);
             System.out.println("==========================================\n");
             return;
         }
@@ -45,10 +46,14 @@ public class EmailService {
             message.setSubject("RevTickets - Password Reset Request");
             message.setText(emailBody);
             mailSender.send(message);
-            System.out.println("Password reset email sent to: " + toEmail);
+            System.out.println("✅ Password reset email sent successfully to: " + toEmail);
         } catch (Exception e) {
-            System.err.println("Failed to send password reset email: " + e.getMessage());
-            throw new RuntimeException("Failed to send email", e);
+            System.err.println("❌ Failed to send password reset email: " + e.getMessage());
+            e.printStackTrace();
+            System.out.println("\n========== EMAIL (Fallback - Console Mode) ==========");
+            System.out.println("To: " + toEmail);
+            System.out.println("Reset Link: " + resetLink);
+            System.out.println("==========================================\n");
         }
     }
     

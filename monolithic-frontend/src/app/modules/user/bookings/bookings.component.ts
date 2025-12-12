@@ -21,7 +21,7 @@ import { Booking } from '../../../core/models/booking.model';
           <div class="bookings-grid">
             <mat-card *ngFor="let booking of allBookings" class="booking-card">
               <mat-card-header>
-                <mat-card-title>{{booking.show?.event?.title || 'Event'}}</mat-card-title>
+                <mat-card-title>{{booking.movieName || booking.show?.event?.title || 'Event'}}</mat-card-title>
                 <mat-card-subtitle>Booking #{{booking.id}} | {{booking.bookingDate | date:'medium'}}</mat-card-subtitle>
               </mat-card-header>
               <mat-card-content>
@@ -52,7 +52,7 @@ import { Booking } from '../../../core/models/booking.model';
           <div class="bookings-grid">
             <mat-card *ngFor="let booking of activeBookings" class="booking-card">
               <mat-card-header>
-                <mat-card-title>{{booking.show?.event?.title || 'Event'}}</mat-card-title>
+                <mat-card-title>{{booking.movieName || booking.show?.event?.title || 'Event'}}</mat-card-title>
                 <mat-card-subtitle>Booking #{{booking.id}} | {{booking.bookingDate | date:'medium'}}</mat-card-subtitle>
               </mat-card-header>
               <mat-card-content>

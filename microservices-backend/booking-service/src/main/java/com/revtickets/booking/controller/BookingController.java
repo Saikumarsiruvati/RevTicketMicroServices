@@ -45,7 +45,7 @@ public class BookingController {
         try {
             // Get booking details for notification
             Map<String, Object> bookingDetails = restTemplate.getForObject(
-                "http://localhost:8083/api/bookings/" + createdBooking.getId() + "/details", Map.class);
+                "http://booking-service:8083/api/bookings/" + createdBooking.getId() + "/details", Map.class);
             
             // Get user details
             Map<String, Object> user = restTemplate.getForObject(
@@ -69,15 +69,19 @@ public class BookingController {
                 Notification saved = notificationRepository.save(notification);
                 System.out.println("✅ Notification saved with ID: " + saved.getId());
                 
-                // Call notification service to send email
-                System.out.println("📧 Calling notification service for email...");
-                Map<String, Object> notificationRequest = new java.util.HashMap<>();
-                notificationRequest.put("bookingId", createdBooking.getId());
-                
-                restTemplate.postForObject(
-                    "http://localhost:8085/api/notifications/booking-confirmation",
-                    notificationRequest,
-                    String.class
+                // Send booking confirmation email directly
+                System.out.println("📧 Sending booking confirmation email...");
+                emailService.sendBookingConfirmationEmail(
+                    user.get("email").toString(),
+                    user.get("name").toString(),
+                    String.valueOf(createdBooking.getId()),
+                    bookingDetails.get("movieName").toString(),
+                    bookingDetails.get("showTime").toString(),
+                    bookingDetails.get("seatNumbers").toString(),
+                    bookingDetails.get("totalAmount").toString(),
+                    bookingDetails.get("venueName").toString(),
+                    bookingDetails.get("movieLanguage") != null ? bookingDetails.get("movieLanguage").toString() : "N/A",
+                    bookingDetails.get("movieGenre") != null ? bookingDetails.get("movieGenre").toString() : "N/A"
                 );
                 System.out.println("✅ Email sent successfully");
             }
@@ -103,15 +107,15 @@ public class BookingController {
         try {
             // Get show details
             Map<String, Object> show = restTemplate.getForObject(
-                "http://localhost:8082/api/shows/" + booking.getShowId(), Map.class);
+                "http://event-service:8082/api/shows/" + booking.getShowId(), Map.class);
             
             // Get event/movie details
             Map<String, Object> event = restTemplate.getForObject(
-                "http://localhost:8082/api/events/" + show.get("eventId"), Map.class);
+                "http://event-service:8082/api/events/" + show.get("eventId"), Map.class);
             
             // Get venue details
             Map<String, Object> venue = restTemplate.getForObject(
-                "http://localhost:8082/api/venues/" + show.get("venueId"), Map.class);
+                "http://event-service:8082/api/venues/" + show.get("venueId"), Map.class);
             
             // Build complete details
             details.put("bookingId", booking.getId());
@@ -147,8 +151,40 @@ public class BookingController {
     }
 
     @GetMapping("/user/{userId}")
-    public ResponseEntity<List<Booking>> getBookingsByUserId(@PathVariable Long userId) {
-        return ResponseEntity.ok(bookingService.getBookingsByUserId(userId));
+    public ResponseEntity<List<Map<String, Object>>> getBookingsByUserId(@PathVariable Long userId) {
+        List<Booking> bookings = bookingService.getBookingsByUserId(userId);
+        List<Map<String, Object>> enrichedBookings = new java.util.ArrayList<>();
+        
+        for (Booking booking : bookings) {
+            Map<String, Object> enriched = new java.util.HashMap<>();
+            enriched.put("id", booking.getId());
+            enriched.put("userId", booking.getUserId());
+            enriched.put("showId", booking.getShowId());
+            enriched.put("numberOfSeats", booking.getNumberOfSeats());
+            enriched.put("seatNumbers", booking.getSeatNumbers());
+            enriched.put("totalAmount", booking.getTotalAmount());
+            enriched.put("status", booking.getStatus());
+            enriched.put("bookingDate", booking.getBookingDate());
+            enriched.put("paymentId", booking.getPaymentId());
+            
+            try {
+                Map<String, Object> show = restTemplate.getForObject(
+                    "http://event-service:8082/api/shows/" + booking.getShowId(), Map.class);
+                if (show != null) {
+                    Map<String, Object> event = restTemplate.getForObject(
+                        "http://event-service:8082/api/events/" + show.get("eventId"), Map.class);
+                    if (event != null) {
+                        enriched.put("movieName", event.get("title"));
+                    }
+                }
+            } catch (Exception e) {
+                enriched.put("movieName", "Unknown");
+            }
+            
+            enrichedBookings.add(enriched);
+        }
+        
+        return ResponseEntity.ok(enrichedBookings);
     }
 
     @PutMapping("/{id}/confirm")
@@ -167,13 +203,13 @@ public class BookingController {
                 userServiceUrl + "/api/users/" + booking.getUserId(), Map.class);
             
             Map<String, Object> show = restTemplate.getForObject(
-                "http://localhost:8082/api/shows/" + booking.getShowId(), Map.class);
+                "http://event-service:8082/api/shows/" + booking.getShowId(), Map.class);
             
             Map<String, Object> event = restTemplate.getForObject(
-                "http://localhost:8082/api/events/" + show.get("eventId"), Map.class);
+                "http://event-service:8082/api/events/" + show.get("eventId"), Map.class);
             
             Map<String, Object> venue = restTemplate.getForObject(
-                "http://localhost:8082/api/venues/" + show.get("venueId"), Map.class);
+                "http://event-service:8082/api/venues/" + show.get("venueId"), Map.class);
             
             if (user != null && event != null && show != null && venue != null) {
                 System.out.println("🔔 SENDING CANCELLATION EMAIL...");

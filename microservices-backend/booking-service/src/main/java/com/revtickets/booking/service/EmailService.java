@@ -28,6 +28,12 @@ public class EmailService {
         System.out.println("Mail Sender: " + (mailSender != null ? "CONFIGURED" : "NULL"));
         System.out.println("From Email: " + fromEmail);
         
+        if (!emailEnabled || mailSender == null) {
+            System.out.println("⚠️ Email disabled or mail sender not configured. Skipping email.");
+            System.out.println("========== EMAIL SERVICE END ==========\n");
+            return;
+        }
+        
         String ticketLink = "http://localhost:4200/ticket/" + bookingId;
         
         String emailBody = "Dear " + userName + ",\n\n" +
@@ -84,6 +90,12 @@ public class EmailService {
         System.out.println("\n========== CANCELLATION EMAIL SERVICE ==========");
         System.out.println("To: " + toEmail);
         System.out.println("Movie: " + movieName);
+        
+        if (!emailEnabled || mailSender == null) {
+            System.out.println("⚠️ Email disabled or mail sender not configured. Skipping email.");
+            System.out.println("========== CANCELLATION EMAIL END ==========\n");
+            return;
+        }
         
         String emailBody = "Dear " + userName + ",\n\n" +
                 "❌ Your movie booking has been cancelled.\n\n" +

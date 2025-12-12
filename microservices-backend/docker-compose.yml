@@ -7,21 +7,33 @@ services:
     environment:
       MYSQL_ROOT_PASSWORD: 12345
     ports:
-      - "3306:3306"
+      - "3307:3306"
     volumes:
       - mysql_data:/var/lib/mysql
     networks:
       - revtickets-network
+    healthcheck:
+      test: ["CMD", "mysqladmin", "ping", "-h", "localhost", "-p12345"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    restart: unless-stopped
 
   mongo:
     image: mongo:7.0
     container_name: revticket-mongo
     ports:
-      - "27017:27017"
+      - "27018:27017"
     volumes:
       - mongo_data:/data/db
     networks:
       - revtickets-network
+    healthcheck:
+      test: ["CMD", "mongosh", "--eval", "db.adminCommand('ping')"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    restart: unless-stopped
 
   consul:
     image: consul:1.15
@@ -32,16 +44,26 @@ services:
     command: agent -server -ui -bootstrap-expect=1 -client=0.0.0.0
     networks:
       - revtickets-network
+    healthcheck:
+      test: ["CMD", "consul", "members"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    restart: unless-stopped
 
   auth-service:
     build: ./auth-service
     container_name: auth-service
     ports:
       - "8086:8086"
+    environment:
+      SPRING_CLOUD_CONSUL_HOST: consul
     depends_on:
-      - consul
+      consul:
+        condition: service_healthy
     networks:
       - revtickets-network
+    restart: unless-stopped
 
   user-service:
     build: ./user-service
@@ -50,10 +72,15 @@ services:
       - "8081:8081"
     environment:
       SPRING_DATASOURCE_URL: jdbc:mysql://mysql:3306/user_db?createDatabaseIfNotExist=true
+      SPRING_CLOUD_CONSUL_HOST: consul
     depends_on:
-      - mysql
+      mysql:
+        condition: service_healthy
+      consul:
+        condition: service_healthy
     networks:
       - revtickets-network
+    restart: unless-stopped
 
   event-service:
     build: ./event-service
@@ -62,10 +89,15 @@ services:
       - "8082:8082"
     environment:
       SPRING_DATASOURCE_URL: jdbc:mysql://mysql:3306/event_db?createDatabaseIfNotExist=true
+      SPRING_CLOUD_CONSUL_HOST: consul
     depends_on:
-      - mysql
+      mysql:
+        condition: service_healthy
+      consul:
+        condition: service_healthy
     networks:
       - revtickets-network
+    restart: unless-stopped
 
   booking-service:
     build: ./booking-service
@@ -74,10 +106,18 @@ services:
       - "8083:8083"
     environment:
       SPRING_DATASOURCE_URL: jdbc:mysql://mysql:3306/booking_db?createDatabaseIfNotExist=true
+      SPRING_DATA_MONGODB_URI: mongodb://mongo:27017/notification_db
+      SPRING_CLOUD_CONSUL_HOST: consul
     depends_on:
-      - mysql
+      mysql:
+        condition: service_healthy
+      mongo:
+        condition: service_healthy
+      consul:
+        condition: service_healthy
     networks:
       - revtickets-network
+    restart: unless-stopped
 
   payment-service:
     build: ./payment-service
@@ -86,10 +126,15 @@ services:
       - "8084:8084"
     environment:
       SPRING_DATASOURCE_URL: jdbc:mysql://mysql:3306/payment_db?createDatabaseIfNotExist=true
+      SPRING_CLOUD_CONSUL_HOST: consul
     depends_on:
-      - mysql
+      mysql:
+        condition: service_healthy
+      consul:
+        condition: service_healthy
     networks:
       - revtickets-network
+    restart: unless-stopped
 
   notification-service:
     build: ./notification-service
@@ -98,10 +143,15 @@ services:
       - "8085:8085"
     environment:
       SPRING_DATA_MONGODB_URI: mongodb://mongo:27017/notification_db
+      SPRING_CLOUD_CONSUL_HOST: consul
     depends_on:
-      - mongo
+      mongo:
+        condition: service_healthy
+      consul:
+        condition: service_healthy
     networks:
       - revtickets-network
+    restart: unless-stopped
 
   review-service:
     build: ./review-service
@@ -110,28 +160,55 @@ services:
       - "8087:8087"
     environment:
       SPRING_DATA_MONGODB_URI: mongodb://mongo:27017/review_db
+      SPRING_CLOUD_CONSUL_HOST: consul
     depends_on:
-      - mongo
-      - consul
+      mongo:
+        condition: service_healthy
+      consul:
+        condition: service_healthy
     networks:
       - revtickets-network
+    restart: unless-stopped
 
   api-gateway:
     build: ./api-gateway
     container_name: api-gateway
     ports:
-      - "8080:8080"
+      - "8090:8080"
+    environment:
+      SPRING_CLOUD_CONSUL_HOST: consul
     depends_on:
-      - consul
-      - auth-service
-      - user-service
-      - event-service
-      - booking-service
-      - payment-service
-      - notification-service
-      - review-service
+      consul:
+        condition: service_healthy
+      auth-service:
+        condition: service_started
+      user-service:
+        condition: service_started
+      event-service:
+        condition: service_started
+      booking-service:
+        condition: service_started
+      payment-service:
+        condition: service_started
+      notification-service:
+        condition: service_started
+      review-service:
+        condition: service_started
     networks:
       - revtickets-network
+    restart: unless-stopped
+
+  frontend:
+    build: ../monolithic-frontend
+    container_name: revticket-frontend
+    ports:
+      - "4200:4200"
+    depends_on:
+      api-gateway:
+        condition: service_started
+    networks:
+      - revtickets-network
+    restart: unless-stopped
 
 volumes:
   mysql_data:

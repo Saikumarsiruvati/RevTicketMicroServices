@@ -55,17 +55,28 @@ public class AuthService {
     
     public void resetPassword(String email, String newPassword) {
         try {
+            System.out.println("\n========== RESET PASSWORD ==========");
+            System.out.println("Email: " + email);
+            System.out.println("User Service URL: " + userServiceUrl);
+            
             Map<String, Object> user = restTemplate.getForObject(
                 userServiceUrl + "/api/users/email/" + email, Map.class);
             if (user == null) throw new RuntimeException("User not found");
             
+            System.out.println("User found: " + user.get("id"));
+            
             Map<String, String> updateData = Map.of(
-                "email", email,
                 "password", newPassword
             );
             restTemplate.put(
                 userServiceUrl + "/api/users/" + user.get("id") + "/password", updateData);
+            
+            System.out.println("✅ Password reset successful");
+            System.out.println("========== RESET PASSWORD END ==========\n");
         } catch (Exception e) {
+            System.err.println("❌ Reset password failed: " + e.getMessage());
+            e.printStackTrace();
+            System.out.println("========== RESET PASSWORD END ==========\n");
             throw new RuntimeException("Failed to reset password: " + e.getMessage());
         }
     }

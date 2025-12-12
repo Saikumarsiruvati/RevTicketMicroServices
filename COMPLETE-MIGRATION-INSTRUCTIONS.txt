@@ -1,0 +1,132 @@
+========================================
+COMPLETE DATA MIGRATION INSTRUCTIONS
+========================================
+
+CURRENT STATUS:
+✅ user_db.users: 3 records (MIGRATED)
+✅ event_db.events: 12 records (MIGRATED)
+❌ event_db.venues: 0 records (PENDING)
+❌ event_db.shows: 0 records (PENDING)
+❌ booking_db.bookings: 0 records (PENDING)
+❌ booking_db.seats: 0 records (PENDING)
+❌ payment_db.payments: 0 records (PENDING)
+
+========================================
+OPTION 1: Using MySQL Workbench (EASIEST)
+========================================
+
+STEP 1: Export from LOCAL MySQL (localhost:3306)
+-------------------------------------------------
+1. Open MySQL Workbench
+2. Connect to localhost:3306 (username: root, password: 12345)
+3. Select revtickets database
+4. Go to Server > Data Export
+5. Select these tables:
+   ☑ venues
+   ☑ shows
+   ☑ bookings
+   ☑ seats
+   ☑ payments
+6. Choose "Export to Self-Contained File"
+7. Save as: D:\RevTicket-MS\revtickets_data.sql
+8. Click "Start Export"
+
+STEP 2: Import to DOCKER MySQL (localhost:3307)
+------------------------------------------------
+1. In MySQL Workbench, create NEW connection:
+   - Connection Name: Docker MySQL
+   - Hostname: 127.0.0.1
+   - Port: 3307
+   - Username: root
+   - Password: 12345
+2. Connect to this new connection
+3. Go to Server > Data Import
+4. Choose "Import from Self-Contained File"
+5. Select: D:\RevTicket-MS\revtickets_data.sql
+6. For each table, manually change database:
+   - venues → Import to event_db
+   - shows → Import to event_db
+   - bookings → Import to booking_db
+   - seats → Import to booking_db
+   - payments → Import to payment_db
+7. Click "Start Import"
+
+========================================
+OPTION 2: Using Command Line
+========================================
+
+STEP 1: Find MySQL bin folder
+------------------------------
+Usually located at: C:\Program Files\MySQL\MySQL Server 8.0\bin
+
+STEP 2: Open Command Prompt as Administrator
+---------------------------------------------
+cd "C:\Program Files\MySQL\MySQL Server 8.0\bin"
+
+STEP 3: Export from local MySQL
+--------------------------------
+mysqldump -uroot -p12345 -h 127.0.0.1 --port=3306 --no-create-info revtickets venues > D:\RevTicket-MS\venues.sql
+mysqldump -uroot -p12345 -h 127.0.0.1 --port=3306 --no-create-info revtickets shows > D:\RevTicket-MS\shows.sql
+mysqldump -uroot -p12345 -h 127.0.0.1 --port=3306 --no-create-info revtickets bookings > D:\RevTicket-MS\bookings.sql
+mysqldump -uroot -p12345 -h 127.0.0.1 --port=3306 --no-create-info revtickets seats > D:\RevTicket-MS\seats.sql
+mysqldump -uroot -p12345 -h 127.0.0.1 --port=3306 --no-create-info revtickets payments > D:\RevTicket-MS\payments.sql
+
+STEP 4: Import to Docker MySQL
+-------------------------------
+cd D:\RevTicket-MS
+type venues.sql | docker exec -i revticket-mysql mysql -uroot -p12345 event_db
+type shows.sql | docker exec -i revticket-mysql mysql -uroot -p12345 event_db
+type bookings.sql | docker exec -i revticket-mysql mysql -uroot -p12345 booking_db
+type seats.sql | docker exec -i revticket-mysql mysql -uroot -p12345 booking_db
+type payments.sql | docker exec -i revticket-mysql mysql -uroot -p12345 payment_db
+
+========================================
+OPTION 3: Manual SQL Copy (SIMPLEST)
+========================================
+
+STEP 1: Connect to LOCAL MySQL (localhost:3306) in MySQL Workbench
+-------------------------------------------------------------------
+Run these queries and COPY the results:
+
+SELECT * FROM revtickets.venues;
+SELECT * FROM revtickets.shows;
+SELECT * FROM revtickets.bookings;
+SELECT * FROM revtickets.seats;
+SELECT * FROM revtickets.payments;
+
+STEP 2: Connect to DOCKER MySQL (localhost:3307) in MySQL Workbench
+--------------------------------------------------------------------
+Paste the data into respective tables:
+- venues data → event_db.venues
+- shows data → event_db.shows
+- bookings data → booking_db.bookings
+- seats data → booking_db.seats
+- payments data → payment_db.payments
+
+========================================
+VERIFICATION
+========================================
+
+After migration, run this in Docker MySQL (localhost:3307):
+
+SELECT 'user_db.users' as Table_Name, COUNT(*) as Count FROM user_db.users
+UNION SELECT 'event_db.events', COUNT(*) FROM event_db.events
+UNION SELECT 'event_db.venues', COUNT(*) FROM event_db.venues
+UNION SELECT 'event_db.shows', COUNT(*) FROM event_db.shows
+UNION SELECT 'booking_db.bookings', COUNT(*) FROM booking_db.bookings
+UNION SELECT 'booking_db.seats', COUNT(*) FROM booking_db.seats
+UNION SELECT 'payment_db.payments', COUNT(*) FROM payment_db.payments;
+
+All counts should be > 0
+
+========================================
+RESTART SERVICES
+========================================
+
+After successful migration:
+cd D:\RevTicket-MS\microservices-backend
+docker-compose restart
+
+Then access: http://localhost:4200
+
+========================================
