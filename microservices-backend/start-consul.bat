@@ -1,3 +1,0 @@
-@echo off
-echo Starting Consul...
-consul agent -dev
